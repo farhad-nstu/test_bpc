@@ -1,0 +1,198 @@
+@php 
+use SujalPatel\IntToEnglish\IntToEnglish;
+@endphp 
+@push('css')
+<style>
+input.form-control.float-left.search_input {
+  width: 250px;
+}
+
+ul.pagination {
+  float: right;
+}
+</style>
+@endpush
+@extends("hrms::master")
+@section("content")
+<!-- Main content -->
+<section class="container-fluid position-absolute">
+  <!-- Default box -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"> Salary Sheet </h2>
+      <div class="card-tools">
+        <button type="button" class="btn btn-tool" data-card-widget="collapse" title="Collapse">
+          <i class="fas fa-minus"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="card-body" id="">
+
+
+
+
+      <div class="col-md-12 mt-4">
+
+        <div class="row">
+          <div class="col-md-12">
+
+            <table class="table table-bordered">
+              <thead>
+                <tr>
+                  <th>SL</th>
+                  <th class="text-center">Name</th>
+                  <th class="text-center">Designation</th>
+                  <th class="text-center">NID</th>
+                  <th class="text-center">Basic</th>
+                  @foreach($addRules as $addRule)
+                  <th class="text-center">{{ $addRule->rules_code }}</th>
+                  @endforeach
+
+                  <th class="text-center">Gross Total</th>
+
+                  @foreach($deducRules as $deducRule)
+                  <th class="text-center">{{ $deducRule->rules_code }}</th>
+                  @endforeach
+
+                  @foreach($loans as $loan)
+                  <th class="text-center">{{ $loan->loan_code }} <br> loan</th>
+                  @endforeach
+
+                  <th class="text-center">D-Total</th>
+                  <th class="text-center">Net Total</th>
+
+                </tr>
+              </thead>
+              <tbody>
+                @if (!empty($query))
+
+                  @php
+
+                    $queryData = Modules\Hrms\Entities\HrmsEmployee::where('employee_bpc_id', $query->employee_id)->select('employee_bpc_id', 'employee_name', 'employee_designation', 'employee_nid', 'employee_basic_salary')->first();
+
+                    $loanManagesData = Modules\Hrms\Entities\HrmsLoanManage::where('employee_id',
+                    $query->employee_id)->get();
+
+                    foreach($loanManagesData as $loanManageData){
+                      if(substr($loanManageData->loan_date, 0 , 7) == date('Y-m')) {
+                        $loanManages = json_decode($loanManageData->loans);
+                      }
+                    }
+
+                    $salaryAllowance = json_decode($query->salary_addition_details);
+                    $salaryDeduction = json_decode($query->salary_deductiontion_details);
+
+                    $totalDeduction = array_sum($loanManages->loan_amount) + $query->salary_total_deductiontion;
+                    $grossTotal = $query->salary_total_addition + $queryData->employee_basic_salary;
+                    $total = $grossTotal - $totalDeduction;
+
+                  @endphp
+
+                <tr>
+                  <td class="text-center">1</td>
+                  <td class="text-center">
+                    {{ $queryData->employee_name }} ({{ $queryData->employee_bpc_id }})
+                  </td>
+                  <td class="text-center">
+                    @php
+                      $designation = Modules\Hrms\Entities\HrmsDesignation::where('desg_id',
+                      $queryData->employee_designation)->pluck('desg_title')->first();
+                    @endphp
+                    {{ $designation }}
+                  </td>
+                  <td class="text-center">{{ $queryData->employee_nid }}</td>
+                  <td class="text-center">{{ $queryData->employee_basic_salary }}</td>
+
+                  @foreach($addRules as $addRule)
+                    @if(in_array($addRule->rules_code, $salaryAllowance->code))
+                      <td class="text-center">{{ $addRule->rules_amount }}</td>
+                    @else
+                      <td class="text-center">0</td>
+                    @endif
+                  @endforeach
+
+                  <td class="text-center">{{ $grossTotal }}</td>
+
+                  @foreach($deducRules as $deducRule)
+                    @if(in_array($deducRule->rules_code, $salaryDeduction->deductionCode))
+                      <td class="text-center">{{ $deducRule->rules_amount }}</td>
+                    @else 
+                      <td class="text-center">0</td>
+                    @endif
+                  @endforeach
+
+                  @foreach($loans as $loan)
+                    @if(in_array($loan->loan_code, $loanManages->loan_code))
+                      <td class="text-center">{{ $loan->loan_amount }}</td>
+                    @else 
+                      <td class="text-center">0</td>
+                    @endif
+                  @endforeach
+
+                  <td class="text-center">{{ $totalDeduction }}</td>
+                  <td class="text-center">{{ $total }}</td>
+
+                </tr>
+
+                @else
+
+                <tr>
+                  <td colspan="5">There is nothing found.</td>
+                </tr>
+
+                @endif
+              </tbody>
+            </table>
+            @if(!empty($query))
+            <div class="text-center">
+              <h6 class="font-weight-bold">In word: ( {{ IntToEnglish::Int2Eng($total) }} ) Taka only.</h6>
+            </div>
+            <div>
+              (a) NID No: {{ $queryData->employee_nid }} <br>
+              (b) Increment Date:  &nbsp; Scale: {{ $queryData->employee_basic_salary }}/-(Grade-{{ $queryData->employee_payscale_grade }}) <br>
+              (c) GPF Deduction:  @for($i = 0; $i < count($salaryDeduction->deductionCode); $i++)
+                                      @if($salaryDeduction->deductionCode[$i] == "GPF")
+                                        {{ $salaryDeduction->deductionAmount[$i] }} <br>
+                                      @else N/A <br> @php break; @endphp 
+                                      @endif
+                                    @endfor
+              (d) Basic Pay: {{ $queryData->employee_basic_salary }} <br>
+              (e) BPC Joining Date: {{ $queryData->employee_join_date }} <br>
+              (f) Vehicle Deduction:  @for($i = 0; $i < count($salaryDeduction->deductionCode); $i++)
+                                        @if($salaryDeduction->deductionCode[$i] == "Vehile")
+                                          {{ $salaryDeduction->deductionAmount[$i] }} <br>
+                                        @endif
+                                      @endfor
+              (g) Vehicle Total Allowance:  @for($i = 0; $i < count($salaryAllowance->code); $i++)
+                                              @if($salaryAllowance->code[$i] == "VA")
+                                                {{ $salaryAllowance->amount[$i] }} <br>
+                                              @else N/A <br> @php break; @endphp 
+                                              @endif
+                                            @endfor 
+              (h) Income Tax Tk @for($i = 0; $i < count($salaryDeduction->deductionCode); $i++)
+                                  @if($salaryDeduction->deductionCode[$i] == "IT")
+                                    {{ $salaryDeduction->deductionAmount[$i] }} <br>
+                                  @endif
+                                @endfor
+            </div>
+            @endif 
+
+          </div>
+
+        </div><!-- /row -->
+
+
+      </div>
+
+    </div>
+    <!-- /.card-body -->
+    <div class="card-footer">
+      Salary Sheet
+    </div>
+    <!-- /.card-footer-->
+  </div>
+  <!-- /.card -->
+</section>
+<!-- /.content -->
+@endsection
